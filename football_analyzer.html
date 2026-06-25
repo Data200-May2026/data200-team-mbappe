@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Football Performance Analyzer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2128;
+    --border: #30363d;
+    --muted: #8b949e;
+    --text: #e6edf3;
+    --text-dim: #7d8590;
+    --fwd: #e74c3c;
+    --mid: #3498db;
+    --def: #2ecc71;
+    --gk: #f39c12;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 56px;
+  }
+
+  header .logo {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.3px;
+  }
+
+  header .logo span { color: #3498db; }
+  header .badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: rgba(52,152,219,0.15);
+    color: #58a6ff;
+    border: 1px solid rgba(52,152,219,0.3);
+    font-weight: 500;
+  }
+
+  .container {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+  }
+
+  /* Progress */
+  .progress-wrap { margin-bottom: 28px; }
+  .steps-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 8px;
+  }
+  .step-node {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+  }
+  .step-node:last-child { flex: 0; }
+  .step-circle {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    border: 2px solid var(--border);
+    color: var(--muted);
+    background: var(--surface);
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+  .step-circle.done { background: #2ecc71; border-color: #2ecc71; color: #0d1117; }
+  .step-circle.active { background: #3498db; border-color: #3498db; color: #fff; }
+  .step-line {
+    flex: 1;
+    height: 2px;
+    background: var(--border);
+    transition: background 0.3s;
+  }
+  .step-line.done { background: #2ecc71; }
+  .step-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+    padding: 0 4px;
+  }
+  .step-labels span.active { color: var(--text); }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .card-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  /* Position selector */
+  .pos-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+
+  .pos-btn {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    cursor: pointer;
+    padding: 14px 12px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.15s;
+    outline: none;
+  }
+  .pos-btn:hover { border-color: #444c56; background: #1e242c; }
+  .pos-btn.active { border-width: 2px; }
+  .pos-btn.fwd.active { border-color: var(--fwd); background: rgba(231,76,60,0.08); }
+  .pos-btn.mid.active { border-color: var(--mid); background: rgba(52,152,219,0.08); }
+  .pos-btn.def.active { border-color: var(--def); background: rgba(46,204,113,0.08); }
+  .pos-btn.gk.active  { border-color: var(--gk);  background: rgba(243,156,18,0.08); }
+
+  .pos-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .pos-btn.fwd .pos-icon { background: rgba(231,76,60,0.15); }
+  .pos-btn.mid .pos-icon { background: rgba(52,152,219,0.15); }
+  .pos-btn.def .pos-icon { background: rgba(46,204,113,0.15); }
+  .pos-btn.gk  .pos-icon { background: rgba(243,156,18,0.15); }
+
+  .pos-info .pos-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .pos-info .pos-desc { font-size: 12px; color: var(--muted); margin-top: 1px; }
+
+  /* Text input */
+  .field { margin-bottom: 18px; }
+  .field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .field input[type="text"] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 15px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input[type="text"]:focus { border-color: #3498db; }
+  .field input[type="text"]::placeholder { color: var(--text-dim); }
+
+  /* Range sliders */
+  .range-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .range-row input[type="range"] {
+    flex: 1;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border);
+    border-radius: 4px;
+    outline: none;
+    cursor: pointer;
+  }
+  .range-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #3498db;
+    border: 2px solid #1a2332;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  }
+  .range-row input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #3498db;
+    border: 2px solid #1a2332;
+    cursor: pointer;
+  }
+  .range-val {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    min-width: 54px;
+    text-align: right;
+  }
+
+  .section-divider {
+    border-top: 1px solid var(--border);
+    margin: 20px 0;
+    padding-top: 20px;
+  }
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  /* Buttons */
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+  }
+  .btn {
+    padding: 10px 22px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    outline: none;
+  }
+  .btn-primary {
+    background: #3498db;
+    color: #fff;
+  }
+  .btn-primary:hover { background: #2980b9; }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--surface2); }
+  .btn-danger {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-danger:hover { border-color: var(--fwd); color: var(--fwd); }
+
+  /* Results */
+  .result-hero {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 24px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 16px;
+  }
+  .score-ring {
+    flex-shrink: 0;
+    width: 100px;
+    height: 100px;
+    position: relative;
+  }
+  .score-ring svg { transform: rotate(-90deg); }
+  .score-inner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .score-num { font-size: 26px; font-weight: 700; line-height: 1; }
+  .score-label { font-size: 10px; color: var(--muted); }
+  .result-info .player-name { font-size: 20px; font-weight: 700; color: var(--text); }
+  .result-info .pos-tag {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    display: inline-block;
+    margin: 4px 0 8px;
+  }
+  .tier-badge {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 14px;
+    border-radius: 20px;
+    display: inline-block;
+  }
+  .tier-Elite    { background: rgba(231,76,60,0.15);  color: #e74c3c; }
+  .tier-Strong   { background: rgba(52,152,219,0.15); color: #3498db; }
+  .tier-Average  { background: rgba(243,156,18,0.15); color: #f39c12; }
+  .tier-Developing { background: rgba(139,148,158,0.15); color: #8b949e; }
+
+  .peer-row {
+    display: flex;
+    gap: 16px;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .peer-row .diff { font-weight: 600; }
+  .diff-pos { color: #2ecc71; }
+  .diff-neg { color: #e74c3c; }
+
+  /* Metric cards */
+  .metrics-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .metric-card .mv { font-size: 22px; font-weight: 700; color: var(--text); }
+  .metric-card .ml { font-size: 11px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* Charts */
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .chart-card h3 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 16px;
+  }
+  .chart-wrap { position: relative; width: 100%; }
+
+  /* Contribution bars */
+  .contrib-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .contrib-feat {
+    font-size: 12px;
+    color: var(--muted);
+    width: 160px;
+    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .contrib-track {
+    flex: 1;
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .contrib-fill {
+    height: 100%;
+    border-radius: 4px;
+  }
+  .contrib-val {
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 48px;
+    text-align: right;
+    color: var(--text-dim);
+  }
+
+  /* ANOVA table */
+  .anova-table { width: 100%; border-collapse: collapse; }
+  .anova-table td { padding: 8px 4px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .anova-table tr:last-child td { border-bottom: none; }
+  .anova-table .pname { font-weight: 500; }
+  .anova-table .avg-val { font-weight: 600; text-align: right; }
+  .anova-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+
+  /* Insights */
+  .insights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .insight-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+  }
+  .insight-card .icon { font-size: 20px; margin-bottom: 6px; }
+  .insight-card .title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .insight-card .val { font-size: 14px; font-weight: 600; color: var(--text); }
+
+  /* Mobile */
+  @media (max-width: 520px) {
+    .container { padding: 20px 16px 48px; }
+    .pos-grid { grid-template-columns: 1fr; }
+    .metrics-row { grid-template-columns: 1fr 1fr; }
+    .result-hero { flex-direction: column; text-align: center; }
+    .peer-row { justify-content: center; }
+    .insights-grid { grid-template-columns: 1fr; }
+    .contrib-feat { width: 110px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚽ Football<span>Analyzer</span></div>
+  <div class="badge">v4 · ML Edition</div>
+</header>
+
+<div class="container" id="app"></div>
+
+<script>
+// ── Color palette ─────────────────────────────────────────────
+const PAL = { Forward:'#e74c3c', Midfielder:'#3498db', Defender:'#2ecc71', Goalkeeper:'#f39c12' };
+
+// ── Position feature sets ─────────────────────────────────────
+const POS_FEATS = {
+  Goalkeeper: ['Age','Experience_Years','Fitness_Score','Training_Hours','Recovery_Days',
+               'Passes_Per_Game','Aerial_Duels_Won','Saves_Per_Game','Clean_Sheets',
+               'Goals_Conceded_PG','Distribution_Accuracy','Sweeper_Actions'],
+  Midfielder: ['Age','Experience_Years','Fitness_Score','Training_Hours','Recovery_Days',
+               'Passes_Per_Game','Shots_Per_Game','Aerial_Duels_Won','Key_Passes_Per_Game',
+               'Dribbles_Completed_PG','Tackles_Won_PG','Pass_Completion_Pct',
+               'Distance_Covered_Km','Through_Balls_PG'],
+  Forward:    ['Age','Experience_Years','Fitness_Score','Training_Hours','Recovery_Days',
+               'Passes_Per_Game','Shots_Per_Game','Aerial_Duels_Won','Goals_Per_Game',
+               'Shots_On_Target_Pct','Conversion_Rate_Pct','Big_Chances_Created_PG',
+               'Touches_In_Box_PG','Offsides_PG'],
+  Defender:   ['Age','Experience_Years','Fitness_Score','Training_Hours','Recovery_Days',
+               'Passes_Per_Game','Shots_Per_Game','Aerial_Duels_Won','Tackles_Won_PG',
+               'Interceptions_PG','Clearances_PG','Blocks_PG','Duels_Won_Pct']
+};
+
+// ── Seeded RNG (matches Python np.random.seed(42) behavior closely) ──
+function seededRng(seed) {
+  let s = seed >>> 0;
+  return function() {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 0x100000000;
+  };
+}
+
+// ── Build synthetic dataset ───────────────────────────────────
+function buildDataset() {
+  const rng = seededRng(42);
+  const N = 1600;
+  const positions = ['Forward','Midfielder','Defender','Goalkeeper'];
+  const rows = [];
+  for (let i = 0; i < N; i++) {
+    const pos = positions[i % 4];
+    const isgk = pos === 'Goalkeeper', ismid = pos === 'Midfielder';
+    const isfwd = pos === 'Forward',   isdef = pos === 'Defender';
+
+    const age = 18 + Math.floor(rng() * 19);
+    const exp = Math.max(0, age - 18 + rng() * 3 - 1.5);
+    const fit = 50 + rng() * 50;
+    const trn = 8  + rng() * 24;
+    const rec = 1  + rng() * 6;
+    const pas = isgk ? 10 + rng() * 70 : 15 + rng() * 75;
+    const sht = isgk ? rng() * 0.3 : 0.5 + rng() * 7.5;
+    const aer = rng() * 10;
+
+    const saves   = isgk ? 1  + rng() * 9  : 0;
+    const cs      = isgk ? rng() * 30       : 0;
+    const gc      = isgk ? 0.5 + rng() * 2.5 : 0;
+    const dist_ac = isgk ? 45 + rng() * 50  : 0;
+    const swp     = isgk ? rng() * 8        : 0;
+
+    const kp  = ismid ? rng() * 8  : 0;
+    const drb = ismid ? rng() * 10 : 0;
+    const pc  = ismid ? 60 + rng() * 38 : 0;
+    const dc  = ismid ? 7  + rng() * 6  : 0;
+    const tb  = ismid ? rng() * 5  : 0;
+
+    const goals = isfwd ? rng() * 3  : 0;
+    const sot   = isfwd ? 20 + rng() * 60 : 0;
+    const conv  = isfwd ? 5  + rng() * 35 : 0;
+    const bc    = isfwd ? rng() * 5  : 0;
+    const tib   = isfwd ? rng() * 15 : 0;
+    const off   = isfwd ? rng() * 5  : 0;
+
+    const tkl  = (ismid || isdef) ? rng() * 8  : 0;
+    const intc = isdef ? rng() * 8  : 0;
+    const clr  = isdef ? rng() * 15 : 0;
+    const blk  = isdef ? rng() * 5  : 0;
+    const duel = isdef ? 30 + rng() * 60 : 0;
+
+    let perf = 0.30*fit + 0.20*trn + 0.12*exp + 0.08*pas*0.3
+             + 0.15*sht*2.5 + 0.04*aer*1.5 - 0.08*rec + 4;
+
+    if (isgk) perf += saves*1.2 + cs*0.3 - gc*1.5 + dist_ac*0.05 + swp*0.5;
+    if (ismid) perf += kp*0.40 + drb*0.28 + tkl*0.32 + pc*0.032 + dc*0.40 + tb*0.52;
+    if (isfwd) perf += goals*3.0 + sot*0.05 + conv*0.08 + bc*0.8 + tib*0.15 - off*0.5;
+    if (isdef) perf += tkl*0.6 + intc*0.6 + clr*0.4 + blk*0.8 + duel*0.05;
+
+    perf += rng() * 10 - 5;
+    perf = Math.max(0, Math.min(100, perf));
+
+    rows.push({
+      Position: pos, Age: age, Experience_Years: exp,
+      Fitness_Score: fit, Training_Hours: trn, Recovery_Days: rec,
+      Passes_Per_Game: pas, Shots_Per_Game: sht, Aerial_Duels_Won: aer,
+      Saves_Per_Game: saves, Clean_Sheets: cs, Goals_Conceded_PG: gc,
+      Distribution_Accuracy: dist_ac, Sweeper_Actions: swp,
+      Key_Passes_Per_Game: kp, Dribbles_Completed_PG: drb, Pass_Completion_Pct: pc,
+      Distance_Covered_Km: dc, Through_Balls_PG: tb,
+      Goals_Per_Game: goals, Shots_On_Target_Pct: sot, Conversion_Rate_Pct: conv,
+      Big_Chances_Created_PG: bc, Touches_In_Box_PG: tib, Offsides_PG: off,
+      Tackles_Won_PG: tkl, Interceptions_PG: intc, Clearances_PG: clr,
+      Blocks_PG: blk, Duels_Won_Pct: duel,
+      Performance_Score: perf
+    });
+  }
+  return rows;
+}
+
+// ── Math helpers ─────────────────────────────────────────────
+function mean(arr) { return arr.reduce((a,b)=>a+b,0)/arr.length; }
+function stddev(arr) {
+  const m = mean(arr);
+  return Math.sqrt(arr.reduce((a,b)=>a+(b-m)**2,0)/arr.length) || 1;
+}
+function solveLinear(A, b) {
+  const n = A.length;
+  const M = A.map((r,i)=>[...r,b[i]]);
+  for (let c = 0; c < n; c++) {
+    let mx = c;
+    for (let r = c+1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[mx][c])) mx = r;
+    [M[c], M[mx]] = [M[mx], M[c]];
+    const piv = M[c][c] || 1e-12;
+    for (let r = 0; r < n; r++) if (r !== c) {
+      const f = M[r][c]/piv;
+      for (let j = c; j <= n; j++) M[r][j] -= f*M[c][j];
+    }
+    for (let j = c; j <= n; j++) M[c][j] /= piv;
+  }
+  return M.map(r=>r[n]);
+}
+
+function buildModel(rows, feats) {
+  const X = rows.map(r=>feats.map(f=>r[f]));
+  const y = rows.map(r=>r.Performance_Score);
+  const means  = feats.map((_,j)=>mean(X.map(r=>r[j])));
+  const stds   = feats.map((_,j)=>stddev(X.map(r=>r[j])));
+  const Xs     = X.map(r=>feats.map((_,j)=>(r[j]-means[j])/stds[j]));
+  const p      = feats.length;
+  const XtX    = Array.from({length:p},(_,i)=>Array.from({length:p},(_,j)=>Xs.reduce((a,r)=>a+r[i]*r[j],0)));
+  const Xty    = feats.map((_,j)=>Xs.reduce((a,r,i)=>a+r[j]*y[i],0));
+  for (let i=0;i<p;i++) XtX[i][i] += 1e-6;
+  const coefs = solveLinear(XtX, Xty);
+  const intercept = mean(y) - coefs.reduce((a,c,j)=>a+c*means[j]/stds[j],0);
+  const ymean = mean(y);
+  let sst=0, ssr=0;
+  y.forEach((yi,i)=>{
+    const yp = coefs.reduce((a,c,j)=>a+c*Xs[i][j],0) + intercept;
+    sst += (yi-ymean)**2; ssr += (yi-yp)**2;
+  });
+  return { coefs, intercept, means, stds, r2: 1-ssr/sst, rmse: Math.sqrt(ssr/rows.length), feats };
+}
+
+function predict(model, stats) {
+  const xs = model.feats.map((f,j)=>(stats[f]-model.means[j])/model.stds[j]);
+  return Math.max(0, Math.min(100, xs.reduce((a,v,j)=>a+model.coefs[j]*v,0)+model.intercept));
+}
+
+function fOneway(groups) {
+  const all = groups.flat();
+  const grand = mean(all); const N = all.length; const k = groups.length;
+  let SSB=0, SSW=0;
+  groups.forEach(g=>{ const m=mean(g); SSB+=g.length*(m-grand)**2; g.forEach(v=>SSW+=(v-m)**2); });
+  const dfB=k-1, dfW=N-k;
+  return { F:(SSB/dfB)/(SSW/dfW), dfB, dfW };
+}
+
+// ── Pre-build everything ──────────────────────────────────────
+const DATA   = buildDataset();
+const MODELS = {};
+const POS_AVGS = {};
+const GROUPS = {};
+['Forward','Midfielder','Defender','Goalkeeper'].forEach(pos=>{
+  const rows = DATA.filter(r=>r.Position===pos);
+  MODELS[pos]   = buildModel(rows, POS_FEATS[pos]);
+  GROUPS[pos]   = rows.map(r=>r.Performance_Score);
+  POS_AVGS[pos] = mean(GROUPS[pos]);
+});
+
+// ── App state ─────────────────────────────────────────────────
+let state = { step:0, name:'', position:'', general:{}, posStats:{} };
+let charts = {};
+
+const app = document.getElementById('app');
+
+// ── Render router ─────────────────────────────────────────────
+function render() {
+  destroyCharts();
+  if      (state.step===0) renderStep0();
+  else if (state.step===1) renderStep1();
+  else if (state.step===2) renderStep2();
+  else                     renderResults();
+}
+
+// ── Progress bar ──────────────────────────────────────────────
+function progressHTML(active) {
+  const labels = ['Player','General stats','Position stats','Results'];
+  const nodes = labels.map((l,i)=>{
+    const cls = i<active?'done':i===active?'active':'';
+    const sym = i<active?'✓':i+1;
+    const line = i<3?`<div class="step-line ${i<active?'done':''}"></div>`:'';
+    return `<div class="step-node">
+      <div class="step-circle ${cls}">${sym}</div>
+      ${line}
+    </div>`;
+  }).join('');
+  const lbls = labels.map((l,i)=>`<span class="${i===active?'active':''}">${l}</span>`).join('');
+  return `<div class="progress-wrap">
+    <div class="steps-row">${nodes}</div>
+    <div class="step-labels">${lbls}</div>
+  </div>`;
+}
+
+// ── Step 0: Name + Position ───────────────────────────────────
+function renderStep0() {
+  const posConfigs = [
+    { pos:'Forward',    cls:'fwd', emoji:'⚡', desc:'Striker / Winger' },
+    { pos:'Midfielder', cls:'mid', emoji:'🎯', desc:'Playmaker / Box-to-box' },
+    { pos:'Defender',   cls:'def', emoji:'🛡️', desc:'Centre-back / Full-back' },
+    { pos:'Goalkeeper', cls:'gk',  emoji:'🧤', desc:'Shot-stopper / Sweeper-keeper' },
+  ];
+  app.innerHTML = progressHTML(0) + `
+  <div class="card">
+    <div class="card-title">Player details</div>
+    <div class="card-sub">Enter the player's name and select their position on the pitch.</div>
+    <div class="field">
+      <label>Player name</label>
+      <input type="text" id="pname" placeholder="e.g. Marcus Rashford" value="${state.name||''}">
+    </div>
+    <div class="field">
+      <label>Position</label>
+      <div class="pos-grid">
+        ${posConfigs.map(c=>`
+          <button class="pos-btn ${c.cls} ${state.position===c.pos?'active':''}" onclick="selectPos('${c.pos}')">
+            <div class="pos-icon">${c.emoji}</div>
+            <div class="pos-info">
+              <div class="pos-name">${c.pos}</div>
+              <div class="pos-desc">${c.desc}</div>
+            </div>
+          </button>`).join('')}
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="step0next()">Continue →</button>
+    </div>
+  </div>`;
+}
+
+function selectPos(p) { state.position = p; render(); }
+
+function step0next() {
+  const n = document.getElementById('pname').value.trim();
+  if (!n) { alert('Please enter a player name.'); return; }
+  if (!state.position) { alert('Please select a position.'); return; }
+  state.name = n; state.step = 1; render();
+}
+
+// ── Range field helper ────────────────────────────────────────
+function rf(label, id, min, max, val, dec, unit) {
+  const v = state.general[id] ?? state.posStats[id] ?? val;
+  return `<div class="field">
+    <label>${label}</label>
+    <div class="range-row">
+      <input type="range" id="${id}" min="${min}" max="${max}" step="${dec>0?0.1:1}" value="${v}"
+             oninput="document.getElementById('${id}_v').textContent=fmtRng(this.value,${dec},'${unit}')">
+      <span class="range-val" id="${id}_v">${fmtRng(v,dec,unit)}</span>
+    </div>
+  </div>`;
+}
+
+function fmtRng(v, dec, unit) {
+  return parseFloat(v).toFixed(dec) + (unit?' '+unit:'');
+}
+
+// ── Step 1: General stats ─────────────────────────────────────
+function renderStep1() {
+  app.innerHTML = progressHTML(1) + `
+  <div class="card">
+    <div class="card-title">General stats</div>
+    <div class="card-sub">Physical and training profile for <strong>${state.name}</strong> (${state.position}).</div>
+    ${rf('Age','age',16,40,state.general.age||24,0,'yrs')}
+    ${rf('Experience','exp',0,25,state.general.exp||5,1,'yrs')}
+    ${rf('Fitness score','fit',0,100,state.general.fit||75,0,'/100')}
+    ${rf('Training hours / week','trn',5,35,state.general.trn||18,1,'hrs')}
+    ${rf('Recovery days / week','rec',0,7,state.general.rec||2,0,'days')}
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="state.step=0;render()">← Back</button>
+      <button class="btn btn-primary" onclick="step1next()">Continue →</button>
+    </div>
+  </div>`;
+}
+
+function gv(id) { return parseFloat(document.getElementById(id)?.value||0); }
+
+function step1next() {
+  state.general = { age:gv('age'), exp:gv('exp'), fit:gv('fit'), trn:gv('trn'), rec:gv('rec') };
+  state.step = 2; render();
+}
+
+// ── Step 2: Position stats ────────────────────────────────────
+function renderStep2() {
+  const pos = state.position;
+  let html = progressHTML(2) + `<div class="card">
+    <div class="card-title">${pos} stats</div>
+    <div class="card-sub">Performance data specific to ${state.name}'s role on the pitch.</div>
+    <div class="section-label">Match stats</div>`;
+
+  if (pos === 'Goalkeeper') {
+    html += rf('Passes per game','ppg',10,80,state.posStats.ppg||38,0,'pg');
+    html += rf('Aerial duels won / game','aer',0,10,state.posStats.aer||3,1,'pg');
+    html += `<div class="section-divider"><div class="section-label">Goalkeeper specifics</div></div>`;
+    html += rf('Saves per game','saves',0,15,state.posStats.saves||4.5,1,'pg');
+    html += rf('Clean sheets / season','cs',0,38,state.posStats.cs||10,0,'');
+    html += rf('Goals conceded / game','gc',0,5,state.posStats.gc||1.0,1,'pg');
+    html += rf('Distribution accuracy','dist',40,100,state.posStats.dist||65,0,'%');
+    html += rf('Sweeper-keeper actions / game','swp',0,10,state.posStats.swp||2,1,'pg');
+  } else if (pos === 'Forward') {
+    html += rf('Passes per game','ppg',5,100,state.posStats.ppg||32,0,'pg');
+    html += rf('Shots per game','sht',0,10,state.posStats.sht||3,1,'pg');
+    html += rf('Aerial duels won / game','aer',0,15,state.posStats.aer||3,1,'pg');
+    html += `<div class="section-divider"><div class="section-label">Attacking specifics</div></div>`;
+    html += rf('Goals per game','goals',0,3,state.posStats.goals||0.5,1,'pg');
+    html += rf('Shots on target','sot',0,100,state.posStats.sot||50,0,'%');
+    html += rf('Shot conversion rate','conv',0,50,state.posStats.conv||22,0,'%');
+    html += rf('Big chances created / game','bc',0,5,state.posStats.bc||1.5,1,'pg');
+    html += rf('Touches in box / game','tib',0,15,state.posStats.tib||7,1,'pg');
+    html += rf('Offsides / game','off',0,5,state.posStats.off||1.5,1,'pg');
+  } else if (pos === 'Midfielder') {
+    html += rf('Passes per game','ppg',5,100,state.posStats.ppg||55,0,'pg');
+    html += rf('Shots per game','sht',0,8,state.posStats.sht||1.2,1,'pg');
+    html += rf('Aerial duels won / game','aer',0,15,state.posStats.aer||2.5,1,'pg');
+    html += `<div class="section-divider"><div class="section-label">Midfield specifics</div></div>`;
+    html += rf('Key passes / game','kp',0,8,state.posStats.kp||1.5,1,'pg');
+    html += rf('Dribbles completed / game','drb',0,10,state.posStats.drb||2.5,1,'pg');
+    html += rf('Tackles won / game','tkl',0,8,state.posStats.tkl||2.5,1,'pg');
+    html += rf('Pass completion','pc',50,100,state.posStats.pc||84,0,'%');
+    html += rf('Distance covered / game','dc',7,13,state.posStats.dc||10.5,1,'km');
+    html += rf('Through balls / game','tb',0,5,state.posStats.tb||0.8,1,'pg');
+  } else {
+    html += rf('Passes per game','ppg',5,100,state.posStats.ppg||58,0,'pg');
+    html += rf('Shots per game','sht',0,5,state.posStats.sht||0.4,1,'pg');
+    html += rf('Aerial duels won / game','aer',0,15,state.posStats.aer||5,1,'pg');
+    html += `<div class="section-divider"><div class="section-label">Defensive specifics</div></div>`;
+    html += rf('Tackles won / game','tkl',0,8,state.posStats.tkl||4,1,'pg');
+    html += rf('Interceptions / game','intc',0,8,state.posStats.intc||3.5,1,'pg');
+    html += rf('Clearances / game','clr',0,15,state.posStats.clr||6,1,'pg');
+    html += rf('Blocks / game','blk',0,5,state.posStats.blk||1.5,1,'pg');
+    html += rf('Duels won','duel',0,100,state.posStats.duel||58,0,'%');
+  }
+
+  html += `<div class="btn-row">
+    <button class="btn btn-secondary" onclick="state.step=1;render()">← Back</button>
+    <button class="btn btn-primary" onclick="step2next()">📊 Analyse player</button>
+  </div></div>`;
+  app.innerHTML = html;
+}
+
+function step2next() {
+  const pos = state.position;
+  const ps = {};
+  const ids = pos==='Goalkeeper' ? ['ppg','aer','saves','cs','gc','dist','swp']
+            : pos==='Forward'    ? ['ppg','sht','aer','goals','sot','conv','bc','tib','off']
+            : pos==='Midfielder' ? ['ppg','sht','aer','kp','drb','tkl','pc','dc','tb']
+            :                     ['ppg','sht','aer','tkl','intc','clr','blk','duel'];
+  ids.forEach(id=>{ ps[id]=gv(id); });
+  state.posStats = ps;
+  state.step = 3; render();
+}
+
+// ── Build player stat object ──────────────────────────────────
+function buildPlayerStats() {
+  const g=state.general, p=state.posStats;
+  return {
+    Age:g.age, Experience_Years:g.exp, Fitness_Score:g.fit,
+    Training_Hours:g.trn, Recovery_Days:g.rec,
+    Passes_Per_Game:p.ppg||0, Shots_Per_Game:p.sht||0, Aerial_Duels_Won:p.aer||0,
+    Saves_Per_Game:p.saves||0, Clean_Sheets:p.cs||0, Goals_Conceded_PG:p.gc||0,
+    Distribution_Accuracy:p.dist||0, Sweeper_Actions:p.swp||0,
+    Key_Passes_Per_Game:p.kp||0, Dribbles_Completed_PG:p.drb||0,
+    Pass_Completion_Pct:p.pc||0, Distance_Covered_Km:p.dc||0, Through_Balls_PG:p.tb||0,
+    Goals_Per_Game:p.goals||0, Shots_On_Target_Pct:p.sot||0,
+    Conversion_Rate_Pct:p.conv||0, Big_Chances_Created_PG:p.bc||0,
+    Touches_In_Box_PG:p.tib||0, Offsides_PG:p.off||0,
+    Tackles_Won_PG:p.tkl||0, Interceptions_PG:p.intc||0,
+    Clearances_PG:p.clr||0, Blocks_PG:p.blk||0, Duels_Won_Pct:p.duel||0
+  };
+}
+
+// ── Step 3: Results ───────────────────────────────────────────
+function renderResults() {
+  const pos   = state.position;
+  const model = MODELS[pos];
+  const pStats = buildPlayerStats();
+  const score  = predict(model, pStats);
+  const tier   = score>=75?'Elite':score>=60?'Strong':score>=45?'Average':'Developing';
+  const peerAvg = POS_AVGS[pos];
+  const diff    = score - peerAvg;
+
+  // Factor contributions
+  const feats = model.feats;
+  const xs = feats.map((f,j)=>(pStats[f]-model.means[j])/model.stds[j]);
+  const contribs = feats.map((f,j)=>({
+    feat: f.replace(/_/g,' '),
+    impact: model.coefs[j]*xs[j],
+    raw: pStats[f]
+  })).sort((a,b)=>b.impact-a.impact);
+  const maxImp = Math.max(...contribs.map(c=>Math.abs(c.impact)));
+
+  const topStrength = contribs.find(c=>c.impact>0)?.feat || '—';
+  const biggestDrag = [...contribs].reverse().find(c=>c.impact<0)?.feat || '—';
+
+  // ANOVA
+  const groups  = ['Forward','Midfielder','Defender','Goalkeeper'].map(p=>GROUPS[p]);
+  const anova   = fOneway(groups);
+
+  // Score ring SVG
+  const pct   = score/100;
+  const R=42, cx=50, cy=50, circ=2*Math.PI*R;
+  const dash  = pct*circ;
+  const col   = PAL[pos];
+
+  app.innerHTML = progressHTML(3) + `
+
+  <!-- Hero card -->
+  <div class="result-hero">
+    <div class="score-ring">
+      <svg width="100" height="100" viewBox="0 0 100 100">
+        <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#30363d" stroke-width="8"/>
+        <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${col}" stroke-width="8"
+                stroke-dasharray="${dash.toFixed(2)} ${circ.toFixed(2)}"
+                stroke-linecap="round"/>
+      </svg>
+      <div class="score-inner">
+        <div class="score-num" style="color:${col}">${score.toFixed(1)}</div>
+        <div class="score-label">/ 100</div>
+      </div>
+    </div>
+    <div class="result-info">
+      <div class="player-name">${state.name}</div>
+      <div class="pos-tag" style="background:${col}22;color:${col}">${pos}</div>
+      <div class="tier-badge tier-${tier}">${tier}</div>
+      <div class="peer-row">
+        <span>Position avg: ${peerAvg.toFixed(1)}</span>
+        <span class="diff ${diff>=0?'diff-pos':'diff-neg'}">${diff>=0?'+':''}${diff.toFixed(1)} vs peers</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Model metrics -->
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="mv">${(model.r2*100).toFixed(1)}%</div>
+      <div class="ml">R² — variance explained</div>
+    </div>
+    <div class="metric-card">
+      <div class="mv">${model.rmse.toFixed(2)}</div>
+      <div class="ml">Model RMSE</div>
+    </div>
+    <div class="metric-card">
+      <div class="mv">${anova.F.toFixed(2)}</div>
+      <div class="ml">ANOVA F-stat</div>
+    </div>
+  </div>
+
+  <!-- Insights -->
+  <div class="insights-grid" style="margin-bottom:16px">
+    <div class="insight-card">
+      <div class="title">Biggest strength</div>
+      <div class="val" style="color:#2ecc71">↑ ${topStrength}</div>
+    </div>
+    <div class="insight-card">
+      <div class="title">Biggest drag</div>
+      <div class="val" style="color:#e74c3c">↓ ${biggestDrag}</div>
+    </div>
+  </div>
+
+  <!-- Factor impact -->
+  <div class="chart-card">
+    <h3>Factor impact on predicted score</h3>
+    ${contribs.map(c=>{
+      const frac = maxImp>0 ? Math.abs(c.impact)/maxImp : 0;
+      const col  = c.impact>=0?'#2ecc71':'#e74c3c';
+      return `<div class="contrib-item">
+        <div class="contrib-feat" title="${c.feat}">${c.feat}</div>
+        <div class="contrib-track"><div class="contrib-fill" style="width:${(frac*100).toFixed(1)}%;background:${col}"></div></div>
+        <div class="contrib-val">${c.impact>=0?'+':''}${c.impact.toFixed(2)}</div>
+      </div>`;
+    }).join('')}
+  </div>
+
+  <!-- Fitness scatter -->
+  <div class="chart-card">
+    <h3>Fitness vs performance — all positions</h3>
+    <div class="chart-wrap" style="height:240px">
+      <canvas id="scatterChart" role="img" aria-label="Scatter plot of fitness score vs performance score, with ${state.name} highlighted"></canvas>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:12px;color:var(--muted)">
+      ${Object.entries(PAL).map(([p,c])=>`<span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:${c};display:inline-block"></span>${p}</span>`).join('')}
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:50%;background:${PAL[pos]};border:2px solid #fff;display:inline-block"></span>${state.name}</span>
+    </div>
+  </div>
+
+  <!-- Position averages -->
+  <div class="chart-card">
+    <h3>Average performance by position (ANOVA F = ${anova.F.toFixed(2)})</h3>
+    <div class="chart-wrap" style="height:180px">
+      <canvas id="barChart" role="img" aria-label="Bar chart of average performance score by position"></canvas>
+    </div>
+    <table class="anova-table" style="margin-top:12px">
+      ${['Forward','Midfielder','Defender','Goalkeeper'].map(p=>{
+        const avg = POS_AVGS[p];
+        const isActive = p===pos;
+        return `<tr>
+          <td class="pname" style="color:${PAL[p]}">${p}</td>
+          <td>${isActive?`<span class="anova-tag" style="background:${PAL[p]}22;color:${PAL[p]}">your position</span>`:''}</td>
+          <td class="avg-val">${avg.toFixed(1)}</td>
+        </tr>`;
+      }).join('')}
+    </table>
+  </div>
+
+  <!-- Model coefficients -->
+  <div class="chart-card">
+    <h3>${pos} model — feature coefficients (standardised)</h3>
+    <div class="chart-wrap" style="height:${feats.length*32+60}px">
+      <canvas id="coefChart" role="img" aria-label="Horizontal bar chart of linear regression feature coefficients for ${pos} model"></canvas>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="state.step=2;render()">← Adjust stats</button>
+    <button class="btn btn-primary" onclick="resetApp()">New analysis</button>
+  </div>`;
+
+  requestAnimationFrame(()=>{
+    buildScatterChart(pStats, score);
+    buildBarChart();
+    buildCoefChart(model);
+  });
+}
+
+function destroyCharts() {
+  Object.values(charts).forEach(c=>{ try { c.destroy(); } catch(e){} });
+  charts = {};
+}
+
+function buildScatterChart(pStats, score) {
+  const ctx = document.getElementById('scatterChart');
+  if (!ctx) return;
+  const datasets = Object.entries(PAL).map(([pos,col])=>{
+    const subset = DATA.filter(d=>d.Position===pos).slice(0,100);
+    return { label:pos, data:subset.map(d=>({x:d.Fitness_Score,y:d.Performance_Score})),
+             backgroundColor:col+'55', borderColor:'transparent', pointRadius:3, type:'scatter' };
+  });
+  datasets.push({
+    label: state.name,
+    data: [{x:state.general.fit, y:score}],
+    backgroundColor: PAL[state.position],
+    borderColor: '#fff', borderWidth: 2,
+    pointRadius: 8, pointStyle: 'circle', type: 'scatter'
+  });
+  charts.scatter = new Chart(ctx, {
+    type:'scatter', data:{datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:d=>`${d.dataset.label}: Fitness ${d.parsed.x.toFixed(0)}, Score ${d.parsed.y.toFixed(1)}`}} },
+      scales:{
+        x:{ title:{display:true,text:'Fitness score',color:'#8b949e'}, grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#8b949e'} },
+        y:{ title:{display:true,text:'Performance score',color:'#8b949e'}, grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#8b949e'} }
+      }
+    }
+  });
+}
+
+function buildBarChart() {
+  const ctx = document.getElementById('barChart');
+  if (!ctx) return;
+  const labels = ['Forward','Midfielder','Defender','Goalkeeper'];
+  const avgs   = labels.map(p=>parseFloat(POS_AVGS[p].toFixed(1)));
+  charts.bar = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{ data:avgs, backgroundColor:labels.map(p=>PAL[p]+'bb'), borderRadius:6, borderSkipped:false }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:d=>`Avg: ${d.parsed.y.toFixed(1)}`}} },
+      scales:{
+        y:{ beginAtZero:false, grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#8b949e'} },
+        x:{ grid:{display:false}, ticks:{color:'#8b949e'} }
+      }
+    }
+  });
+}
+
+function buildCoefChart(model) {
+  const ctx = document.getElementById('coefChart');
+  if (!ctx) return;
+  const sorted = [...model.feats.map((f,j)=>({feat:f.replace(/_/g,' '),coef:model.coefs[j]}))].sort((a,b)=>b.coef-a.coef);
+  charts.coef = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: sorted.map(c=>c.feat),
+      datasets:[{ data:sorted.map(c=>c.coef),
+        backgroundColor: sorted.map(c=>c.coef>=0?'#2ecc7188':'#e74c3c88'),
+        borderColor:     sorted.map(c=>c.coef>=0?'#2ecc71':'#e74c3c'),
+        borderWidth:1, borderRadius:4, borderSkipped:false }]
+    },
+    options:{
+      indexAxis:'y',
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:d=>`Coef: ${d.parsed.x.toFixed(4)}`}} },
+      scales:{
+        x:{ grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#8b949e'} },
+        y:{ grid:{display:false}, ticks:{color:'#8b949e',font:{size:11}} }
+      }
+    }
+  });
+}
+
+function resetApp() {
+  state = { step:0, name:'', position:'', general:{}, posStats:{} };
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
